@@ -1,5 +1,3 @@
-# [ SIEM and Log Monitoring Lab ]
-
 ## Splunk Enterprise Setup
 
 I installed Splunk Enterprise on RHEL and used it as the SIEM for this lab.
