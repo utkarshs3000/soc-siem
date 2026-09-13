@@ -2,7 +2,7 @@
 
 ## Splunk Enterprise Setup
 
-I installed Splunk Enterprise on my RHEL system and used it as the SIEM for this lab.
+I installed Splunk Enterprise on RHEL and used it as the SIEM for this lab.
 
 I started Splunk using:
 
@@ -16,15 +16,32 @@ Splunk Web was available at:
 http://127.0.0.1:8000
 ```
 
-RHEL was used as the Splunk server and Windows was used as the endpoint sending security logs.
+I also created separate lab indexes so the data was easier to manage, including `lab_web` and `lab_windows`.
+
+## Web Server and Web Logs
+
+I created a simple page on RHEL and started a Python HTTP server on port `8080`.
+
+```bash
+echo "Phase 5 SIEM Lab" > index.html
+python3 -m http.server 8080 > logs/webserver.log 2>&1
+```
+
+I opened the page from RHEL and from my Windows VM `10.10.1.11`.
+
+Each request was written into:
+
+```text
+/home/sate/soc-siem/logs/webserver.log
+```
+
+At first, one wrong Python command was also written into the log. After correcting the command, the web server worked normally.
 
 ## Web Log Ingestion
 
-I created a web log on RHEL using a Python HTTP server and added the log file to Splunk.
+I added `webserver.log` to Splunk as a monitored file and stored it in the `lab_web` index with the `soc-web` sourcetype.
 
-At first, one incorrect Python command was also written into the log. After starting the server correctly, I generated HTTP requests and checked them in Splunk.
-
-![Web log added to Splunk](Screenshot%202026-09-12%20143335.png)
+![alt text](Screenshot%202026-09-12%20143335.png)
 
 I searched for HTTP GET requests using:
 
@@ -32,46 +49,42 @@ I searched for HTTP GET requests using:
 index=lab_web "GET"
 ```
 
-The results showed requests from localhost and my Windows VM `10.10.1.11`.
+The results showed requests from localhost and the Windows VM.
 
-![HTTP GET search](Screenshot%202026-09-12%20151301.png)
+![alt text](Screenshot%202026-09-12%20151301.png)
 
 ## Basic SPL Practice
 
-I used `stats` to count the events:
+I practiced counting and summarizing the web events.
 
 ```spl
 index=lab_web
 | stats count
 ```
 
-![Stats count](Screenshot%202026-09-12%20152447.png)
-
-I also used `timechart` to check how the events were spread over time:
+![alt text](Screenshot%202026-09-12%20152447.png)
 
 ```spl
 index=lab_web
 | timechart count
 ```
 
-![Timechart count](Screenshot%202026-09-12%20152510.png)
-
-Then I counted events by host:
+![alt text](Screenshot%202026-09-12%20152510.png)
 
 ```spl
 index=lab_web
 | stats count by host
 ```
 
-![Events by host](Screenshot%202026-09-12%20153735.png)
+![alt text](Screenshot%202026-09-12%20153735.png)
 
-This helped me understand how Splunk can summarize logs instead of checking every event one by one.
+I also changed the time range while searching so I could focus on recent activity instead of all stored events.
 
 ## Field Extraction
 
-I practiced extracting useful fields from the raw web logs.
+I used `rex` to extract useful values from the raw web logs and displayed them with `table`.
 
-I extracted:
+The fields I extracted were:
 
 ```text
 client_ip
@@ -80,25 +93,21 @@ uri
 status
 ```
 
-and displayed them in a table.
+![alt text](Screenshot%202026-09-12%20230114.png)
 
-![Web log field extraction](Screenshot%202026-09-12%20230114.png)
+This helped me understand how raw log text can be turned into useful fields for investigation.
 
-This helped me understand how raw log text can be converted into useful fields for investigation.
-
-## Windows Log Collection
+## Windows Log Forwarding
 
 I installed Splunk Universal Forwarder on the Windows VM.
 
-On RHEL Splunk, I enabled receiving on TCP port `9997`.
+On RHEL Splunk, I enabled receiving on TCP port `9997` and allowed the Windows VM to reach that port through the RHEL firewall.
 
-I configured the Windows forwarder to send logs to:
+The forwarder was configured to send logs to:
 
 ```text
 10.10.1.10:9997
 ```
-
-I also allowed the required traffic through the RHEL firewall for the lab.
 
 I collected:
 
@@ -109,7 +118,7 @@ Sysmon Operational
 PowerShell Operational
 ```
 
-I then searched:
+I searched:
 
 ```spl
 index=lab_windows
@@ -117,18 +126,18 @@ index=lab_windows
 
 and confirmed that Windows events were reaching Splunk.
 
-![Windows logs in Splunk](Screenshot%202026-09-13%20221000.png)
+![alt text](Screenshot%202026-09-13%20221000.png)
 
 ## Windows Log Sources
 
-I checked the event count by source using:
+I checked the event count by source:
 
 ```spl
 index=lab_windows
 | stats count by source
 ```
 
-Splunk showed data from:
+Splunk showed:
 
 ```text
 WinEventLog:Security
@@ -137,15 +146,15 @@ WinEventLog:Microsoft-Windows-Sysmon/Operational
 WinEventLog:Microsoft-Windows-PowerShell/Operational
 ```
 
-![Windows log sources](Screenshot%202026-09-13%20222341.png)
+![alt text](Screenshot%202026-09-13%20222341.png)
 
-This confirmed that the Windows VM was sending multiple security log sources to the RHEL Splunk server.
+This confirmed that multiple Windows security log sources were reaching the RHEL Splunk server.
 
 ## Authentication Investigation
 
 I used my `soclab` test account to generate failed and successful login activity.
 
-I searched for Windows authentication events related to the account and Event IDs `4625` and `4624`.
+I searched for Event IDs `4625` and `4624` related to the account:
 
 ```spl
 index=lab_windows "soclab" (4625 OR 4624)
@@ -153,26 +162,20 @@ index=lab_windows "soclab" (4625 OR 4624)
 
 `4625` showed failed login activity and `4624` showed successful login activity.
 
-![Authentication investigation](Screenshot%202026-09-13%20224410.png)
+![alt text](Screenshot%202026-09-13%20224410.png)
 
 ## Result
 
-I successfully built a basic SIEM setup using RHEL and Windows.
+I built a basic SIEM lab where RHEL runs Splunk and Windows sends security logs to it.
 
-Windows logs were forwarded to Splunk on RHEL, and I was able to search both web and Windows security events from one place.
-
-I also practiced basic SPL, field extraction and authentication log investigation.
+I was able to generate web activity, collect the logs, search them with SPL, extract fields and investigate Windows authentication events.
 
 ## What I learned
 
-I learned how logs from different systems can be collected into one SIEM.
+I learned how activity becomes a log, how the log is sent to Splunk, and how I can search the same data from one place.
 
-I also learned how to search, filter, count and extract useful information from events instead of reading only raw logs.
-
-The authentication test helped me understand how failed and successful login events can be checked together during an investigation.
+I also learned that useful fields and time ranges make an investigation easier than reading raw events one by one.
 
 ## SOC Relevance
 
-A SOC analyst uses SIEM data to find activity across different systems and log sources.
-
-This lab helped me practice collecting endpoint logs, searching events and starting an investigation from authentication activity.
+This lab gave me practice with log collection, centralized monitoring and basic authentication investigation using Splunk.
