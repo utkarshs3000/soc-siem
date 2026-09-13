@@ -9,7 +9,7 @@ I started Splunk using:
 ```bash
 sudo /opt/splunk/bin/splunk start --accept-license
 ```
-
+Install Splunk Enterprise on RHEL
 Splunk Web was available at:
 
 ```text
